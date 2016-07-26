@@ -11,45 +11,15 @@ using System.IO.Ports;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK;
+using System.Diagnostics;
 
 namespace SailArduino
 {
-    static class GLDraw
-    {
-        static GLDraw()
-        {
-        }
-
-        public static void Axis()
-        {
-            GL.LineWidth(2f);
-            GL.Begin(PrimitiveType.Lines);
-
-            GL.Color3(1f, 0f, 0f);
-            GL.Vertex3(0f, 0f, 0f);
-            GL.Vertex3(50f, 0f, 0f);
-
-            GL.Color3(0f, 1f, 0f);
-            GL.Vertex3(0f, 0f, 0f);
-            GL.Vertex3(0f, 50f, 0f);
-
-            GL.Color3(0f, 0f, 1f);
-            GL.Vertex3(0f, 0f, 0f);
-            GL.Vertex3(0f, 0f, 50f);
-
-            GL.End();
-            GL.LineWidth(1f);
-        }
-
-    }
-
+   
     public partial class Form1 : Form
     {
         bool loaded = false;
         string RxString;
-        double xrot, yrot, zrot;
-
-
 
         public Form1()
         {
@@ -61,56 +31,7 @@ namespace SailArduino
         private void GetAvailablePorts()
         {
             string[] ports = SerialPort.GetPortNames();
-
         }
-
-        private void glControl1_Load(object sender, EventArgs e)
-        {
-            loaded = true;
-            GL.ClearColor(Color.SkyBlue);
-            SetupViewport();
-
-            GL.Enable(EnableCap.DepthTest);
-        }
-
-        private void SetupViewport()
-        {
-            int w = glControl1.Width;
-            int h = glControl1.Height;
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadIdentity();
-            GL.Ortho(0, w, 0, h, -1, 1); // Bottom-left corner pixel has coordinate (0, 0)
-            GL.Viewport(0, 0, w, h); // Use all of the glControl painting area
-        }
-
-        private void glControl1_Paint(object sender, PaintEventArgs e)
-        {
-            if (!loaded) // Don't start drawing till loaded.
-                return;
-
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadIdentity();
-            //For now, try draw everything in immediate mode. 
-            GL.Translate(50, 50, 0);
-            
-
-            GL.Color3(Color.Yellow);
-            GL.Begin(PrimitiveType.Triangles);
-            GL.Vertex3(10, 20,10);
-            GL.Vertex3(100, 20,10);
-            GL.Vertex3(100, 50,10);
-            GL.End();
-
-            GLDraw.Axis();
-            glControl1.Invalidate();
-            glControl1.SwapBuffers();
-        }
-
-
-
-
 
         private void buttonStart_Click(object sender, EventArgs e)
         {
@@ -211,7 +132,215 @@ namespace SailArduino
                         break;
                 }
             }
+
+        }
+
+
+        //Drawing window methods
+        Stopwatch sw = new Stopwatch(); // available to all event handlers
+        private void glControl1_Load(object sender, EventArgs e)
+        {
+            loaded = true;
+            GL.ClearColor(Color.SkyBlue); // Yey! .NET Colors can be used directly!
+            SetupViewport();
+            Application.Idle += Application_Idle; // press TAB twice after +=
+            sw.Start(); // start at application boot
+        }
+
+        void Application_Idle(object sender, EventArgs e)
+        {
+            double milliseconds = ComputeTimeSlice();
+            Accumulate(milliseconds);
+            Animate(milliseconds);
+        }
+
+        float rotation = 0;
+        private void Animate(double milliseconds)
+        {
+            float deltaRotation = (float)milliseconds / 20.0f;
+            rotation += deltaRotation;
+            glControl1.Invalidate();
+        }
+
+        double accumulator = 0;
+        int idleCounter = 0;
+        private void Accumulate(double milliseconds)
+        {
+            idleCounter++;
+            accumulator += milliseconds;
+            if (accumulator > 1000)
+            {
+                accumulator -= 1000;
+                idleCounter = 0; // don't forget to reset the counter!
+            }
+        }
+
+        private double ComputeTimeSlice()
+        {
+            sw.Stop();
+            double timeslice = sw.Elapsed.TotalMilliseconds;
+            sw.Reset();
+            sw.Start();
+            return timeslice;
+        }
+
+
+        private void SetupViewport()
+        {
+            int w = glControl1.Width;
+            int h = glControl1.Height;
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+            GL.Ortho(0, w, 0, h, -1, 1); // Bottom-left corner pixel has coordinate (0, 0)
+            GL.Viewport(0, 0, w, h); // Use all of the glControl painting area
+        }
+
+        private void glControl1_Paint(object sender, PaintEventArgs e)
+        {
+            if (!loaded)
+                return;
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+
+            GL.Translate(x, 0, 0);
+
+            if (glControl1.Focused)
+                GL.Color3(Color.Yellow);
+            else
+                GL.Color3(Color.Blue);
+            GL.Rotate(rotation, Vector3.UnitZ); // OpenTK has this nice Vector3 class!
+            GL.Begin(BeginMode.Triangles);
+            GL.Vertex2(10, 20);
+            GL.Vertex2(100, 20);
+            GL.Vertex2(100, 50);
+            GL.End();
+
+            glControl1.SwapBuffers();
+        }
+
+        int x = 0;
+        private void glControl1_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space)
+            {
+                x++;
+                glControl1.Invalidate();
+            }
+        }
+
+        private void glControl1_Resize(object sender, EventArgs e)
+        {
+            SetupViewport();
+            glControl1.Invalidate();
+        }
+
+
+    }
+
+    public abstract class Volume
+    {
+        public Vector3 Position = Vector3.Zero;
+        public Vector3 Rotation = Vector3.Zero;
+        public Vector3 Scale = Vector3.One;
+
+        public int VertCount;
+        public int IndiceCount;
+        public int ColorDataCount;
+        public Matrix4 ModelMatrix = Matrix4.Identity;
+        public Matrix4 ViewProjectionMatrix = Matrix4.Identity;
+        public Matrix4 ModelViewProjectionMatrix = Matrix4.Identity;
+
+        public abstract Vector3[] GetVerts();
+        public abstract int[] GetIndices(int offset = 0);
+        public abstract Vector3[] GetColorData();
+        public abstract void CalculateModelMatrix();
+    }
+
+    static class GLDraw
+    {
+        static GLDraw()
+        {
+        }
+
+        public class Cube : Volume
+        {
+            public Cube()
+            {
+                VertCount = 8;
+                IndiceCount = 36;
+                ColorDataCount = 8;
+            }
+
+            public override void CalculateModelMatrix()
+            {
+                ModelMatrix = Matrix4.CreateScale(Scale) * Matrix4.CreateRotationX(Rotation.X) * Matrix4.CreateRotationY(Rotation.Y) * Matrix4.CreateRotationZ(Rotation.Z) * Matrix4.CreateTranslation(Position);
+            }
+
+            public override Vector3[] GetColorData()
+            {
+                return new Vector3[] {
+                new Vector3( 1f, 0f, 0f),
+                new Vector3( 0f, 0f, 1f),
+                new Vector3( 0f, 1f, 0f),
+                new Vector3( 1f, 0f, 0f),
+                new Vector3( 0f, 0f, 1f),
+                new Vector3( 0f, 1f, 0f),
+                new Vector3( 1f, 0f, 0f),
+                new Vector3( 0f, 0f, 1f)
+            };
+            }
+
+            public override int[] GetIndices(int offset = 0)
+            {
+                int[] inds = new int[] {
+                //left
+                0, 2, 1,
+                0, 3, 2,
+                //back
+                1, 2, 6,
+                6, 5, 1,
+                //right
+                4, 5, 6,
+                6, 7, 4,
+                //top
+                2, 3, 6,
+                6, 3, 7,
+                //front
+                0, 7, 3,
+                0, 4, 7,
+                //bottom
+                0, 1, 5,
+                0, 5, 4
+            };
+
+                if (offset != 0)
+                {
+                    for (int i = 0; i < inds.Length; i++)
+                    {
+                        inds[i] += offset;
+                    }
+                }
+
+                return inds;
+            }
+
+            public override Vector3[] GetVerts()
+            {
+                return new Vector3[] {new Vector3(-0.5f, -0.5f,  -0.5f),
+                new Vector3(0.5f, -0.5f,  -0.5f),
+                new Vector3(0.5f, 0.5f,  -0.5f),
+                new Vector3(-0.5f, 0.5f,  -0.5f),
+                new Vector3(-0.5f, -0.5f,  0.5f),
+                new Vector3(0.5f, -0.5f,  0.5f),
+                new Vector3(0.5f, 0.5f,  0.5f),
+                new Vector3(-0.5f, 0.5f,  0.5f),
+            };
+            }
         }
 
     }
+
 }
