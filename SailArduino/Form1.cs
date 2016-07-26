@@ -2,16 +2,17 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO.Ports;
+using System.Diagnostics;
+
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK;
-using System.Diagnostics;
+using System.Drawing;
 
 namespace SailArduino
 {
@@ -195,6 +196,7 @@ namespace SailArduino
             GL.Viewport(0, 0, w, h); // Use all of the glControl painting area
         }
 
+        // Technically OnRenderFrame
         private void glControl1_Paint(object sender, PaintEventArgs e)
         {
             if (!loaded)
@@ -329,10 +331,10 @@ namespace SailArduino
 
             public override Vector3[] GetVerts()
             {
-                return new Vector3[] {new Vector3(-0.5f, -0.5f,  -0.5f),
-                new Vector3(0.5f, -0.5f,  -0.5f),
-                new Vector3(0.5f, 0.5f,  -0.5f),
-                new Vector3(-0.5f, 0.5f,  -0.5f),
+                return new Vector3[] {new Vector3(-0.5f, -0.5f,  0.0f),
+                new Vector3(0.5f, -0.5f,  0.0f),
+                new Vector3(0.5f, 0.5f,  0.0f),
+                new Vector3(-0.5f, 0.5f,  0.0f),
                 new Vector3(-0.5f, -0.5f,  0.5f),
                 new Vector3(0.5f, -0.5f,  0.5f),
                 new Vector3(0.5f, 0.5f,  0.5f),
