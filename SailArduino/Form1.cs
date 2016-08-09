@@ -13,6 +13,7 @@ using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK;
 using System.Drawing;
+using System.IO;
 
 namespace SailArduino
 {
@@ -137,16 +138,59 @@ namespace SailArduino
         }
 
 
-        //Drawing window methods
-        Stopwatch sw = new Stopwatch(); // available to all event handlers
-        private void glControl1_Load(object sender, EventArgs e)
+        //shader and fragment and program IDs that will be read in by graphics card.
+        int pgmID;
+        int vsID;
+        int fsID;
+
+        int attribute_vcol;
+        int attribute_vpos;
+        int uniform_mview;
+
+        int vbo_position;
+        int vbo_color;
+        int vbo_mview;
+
+        Vector3[] vertdata;
+        Vector3[] coldata;
+        Matrix4[] mviewdata;
+
+        void initProgram()
         {
-            loaded = true;
-            GL.ClearColor(Color.SkyBlue); // Yey! .NET Colors can be used directly!
-            SetupViewport();
-            Application.Idle += Application_Idle; // press TAB twice after +=
-            sw.Start(); // start at application boot
+            pgmID = GL.CreateProgram();
+            loadShader("vs.glsl", ShaderType.VertexShader, pgmID, out vsID);
+            loadShader("fs.glsl", ShaderType.FragmentShader, pgmID, out fsID);
+            GL.LinkProgram(pgmID);
+            Console.WriteLine(GL.GetProgramInfoLog(pgmID));
+
+            //getting position, colour etc to bind.
+            attribute_vpos = GL.GetAttribLocation(pgmID, "vPosition");
+            attribute_vcol = GL.GetAttribLocation(pgmID, "vColor");
+            uniform_mview = GL.GetUniformLocation(pgmID, "modelview");
+
+            if (attribute_vpos == -1 || attribute_vcol == -1 || uniform_mview == -1)
+            {
+                Console.WriteLine("Error binding attributes");
+            }
+
+            GL.GenBuffers(1, out vbo_position);
+            GL.GenBuffers(1, out vbo_color);
+            GL.GenBuffers(1, out vbo_mview);
         }
+
+        //loading the shaders
+        void loadShader(String filename, ShaderType type, int program, out int address)
+        {
+            address = GL.CreateShader(type);
+            using (StreamReader sr = new StreamReader(filename))
+            {
+                GL.ShaderSource(address, sr.ReadToEnd());
+            }
+            GL.CompileShader(address);
+            GL.AttachShader(program, address);
+            Console.WriteLine(GL.GetShaderInfoLog(address));
+        }
+
 
         void Application_Idle(object sender, EventArgs e)
         {
@@ -186,6 +230,36 @@ namespace SailArduino
         }
 
 
+        //Drawing window methods
+        Stopwatch sw = new Stopwatch(); // available to all event handlers
+        private void glControl1_Load(object sender, EventArgs e)
+        {
+            loaded = true;
+
+            initProgram();
+
+            vertdata = new Vector3[] { new Vector3(-0.8f, -0.8f, 0f),
+                new Vector3( 0.8f, -0.8f, 0f),
+                new Vector3( 0f,  0.8f, 0f)};
+
+
+            coldata = new Vector3[] { new Vector3(1f, 0f, 0f),
+                new Vector3( 0f, 0f, 1f),
+                new Vector3( 0f,  1f, 0f)};
+
+
+            mviewdata = new Matrix4[]{
+                Matrix4.Identity
+            };
+
+            GL.ClearColor(Color.SkyBlue); // Yey! .NET Colors can be used directly!
+            GL.PointSize(5f);
+
+            SetupViewport();
+            Application.Idle += Application_Idle; // press TAB twice after +=
+            sw.Start(); // start at application boot
+        }
+
         private void SetupViewport()
         {
             int w = glControl1.Width;
@@ -202,26 +276,42 @@ namespace SailArduino
             if (!loaded)
                 return;
 
+            //GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            //GL.MatrixMode(MatrixMode.Modelview);
+            //GL.LoadIdentity();
+
+            //GL.Translate(x, 0, 0);
+
+            //if (glControl1.Focused)
+            //    GL.Color3(Color.Yellow);
+            //else
+            //    GL.Color3(Color.Blue);
+            //GL.Rotate(rotation, Vector3.UnitZ); // OpenTK has this nice Vector3 class!
+            //GL.Begin(BeginMode.Triangles);
+            //GL.Vertex2(10, 20);
+            //GL.Vertex2(100, 20);
+            //GL.Vertex2(100, 50);
+            //GL.End();
+
+            //glControl1.SwapBuffers();
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            GL.Enable(EnableCap.DepthTest);
 
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadIdentity();
 
-            GL.Translate(x, 0, 0);
+            GL.EnableVertexAttribArray(attribute_vpos);
+            GL.EnableVertexAttribArray(attribute_vcol);
 
-            if (glControl1.Focused)
-                GL.Color3(Color.Yellow);
-            else
-                GL.Color3(Color.Blue);
-            GL.Rotate(rotation, Vector3.UnitZ); // OpenTK has this nice Vector3 class!
-            GL.Begin(BeginMode.Triangles);
-            GL.Vertex2(10, 20);
-            GL.Vertex2(100, 20);
-            GL.Vertex2(100, 50);
-            GL.End();
+            GL.DrawArrays(BeginMode.Triangles, 0, 3);
 
+            GL.DisableVertexAttribArray(attribute_vpos);
+            GL.DisableVertexAttribArray(attribute_vcol);
+
+
+            GL.Flush();
             glControl1.SwapBuffers();
         }
+
 
         int x = 0;
         private void glControl1_KeyDown(object sender, KeyEventArgs e)
